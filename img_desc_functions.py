@@ -110,3 +110,40 @@ def azure_call(sample_1,pack_1):
         res2.append(result)
     return res2
 
+def blip_call(sample_ove,sam_tit_ove):
+
+    from transformers import AutoProcessor, Blip2ForConditionalGeneration
+    import torch
+
+    processor = AutoProcessor.from_pretrained("Salesforce/blip2-opt-2.7b")
+    model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", torch_dtype=torch.float32)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
+
+    image_sample = Image.open(requests.get("https://105103-veritiv-prod.s3.amazonaws.com/Damroot/xLg/10071/IMAGE_20044788_Pic%201.png", verify=False, stream=True).raw).convert('RGB')  
+    title_sample= "Scotch® 311+ Clear High Tack Box Sealing Tape (48 mm. x 914 m., 6 Rolls/Case)"
+    res= []
+    for image_url, title_string in zip(sample_ove,sam_tit_ove):
+    
+        response = requests.get(image_url, verify=False)
+        image = Image.open(BytesIO(response.content))
+
+        prompt = f"""Write a product description based on the image {image} and Title {title_string} provided. Please follow the example below and use the same tone, length, and details in the example below
+                example: for the given image {image_sample} with title- {title_sample}
+                ,here's a sample of output description
+                Description: Seal your packages securely with Scotch® 311+ Clear High Tack Box Sealing Tape. Designed for high-performance packaging needs, 
+                this tape offers excellent adhesion and durability. Its clear construction ensures a clean, professional appearance, making it ideal for 
+                shipping, storage, and general sealing applications. Depend on Scotch® 311+ for reliable, strong seals that stand up to the demands of your busy environment.
+
+                """
+        inputs = processor(image, text=prompt, return_tensors="pt").to(device, torch.float16)
+        
+        generated_ids = model.generate(**inputs, max_new_tokens=20)
+        generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+    
+        description = generated_text.split("Description:")[1].strip()
+        #display(image.resize((480, 600)))
+        res.append(description)
+
+    return res
