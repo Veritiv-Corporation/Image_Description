@@ -20,6 +20,11 @@ from io import BytesIO
 API_KEY = "AIzaSyAZTNYe-qulKkpJRmmgwsVdVYrdCWyycvk"
 genai.configure(api_key=API_KEY)
 
+from langchain_core.prompts import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+    MessagesPlaceholder,
+)
 
 def gemini_call(sample_1,pack_1):
     image_path = r"C:\Users\liyenga\OneDrive - Veritiv Corp\Documents\Veritiv Projects\Image_description\images\Pic1.png"
@@ -35,7 +40,7 @@ def gemini_call(sample_1,pack_1):
         response = requests.get(image_url, verify=False)
         image = Image.open(BytesIO(response.content))
 
-        prompt = f"""Write a product description based on the image {image} and Title {title_string} provided. Please follow the example below and use the same tone, length, and details in the example below
+        prompt_o = f"""Write a product description based on the image {image} and Title {title_string} provided. Please follow the example below and use the same tone, length, and details in the example below
                 example: for the given image {image_sample} with title- {title_sample}
                 ,here's a sample of output description
                 Description: Seal your packages securely with Scotch® 311+ Clear High Tack Box Sealing Tape. Designed for high-performance packaging needs, 
@@ -43,6 +48,7 @@ def gemini_call(sample_1,pack_1):
                 shipping, storage, and general sealing applications. Depend on Scotch® 311+ for reliable, strong seals that stand up to the demands of your busy environment.
 
                 """
+        prompt=f"Write a product description based on the image {image} and product title {title_string} focusing on product's uses and applications"
         model = genai.GenerativeModel("gemini-1.5-flash")
         result_1 = model.generate_content([prompt, image]).text
     
@@ -66,7 +72,7 @@ def output_llm(chain, image_path,title_string, image_sample,title_sample):
 
 def azure_call(sample_1,pack_1):
 
-    prompt_template_2 = """
+    prompt_template_old = """
     Write a product description based on the image {image_path} and Title {title_string} provided. The marketing description has to mention the uses and benefits of the product as to be explained to a customer in about 500 characters
     Please follow the example below and use the same tone, length, and details in the example below
                 example: for the given Scotch tape {image_sample} with title- {title_sample}
@@ -76,6 +82,12 @@ def azure_call(sample_1,pack_1):
     {format_instructions}
     """
 
+    prompt_template_2 =  HumanMessagePromptTemplate.from_template("Write a product description based on the image {image_url}")# and product title {title_string} focusing on product's uses and applications")
+
+    
+
+    #summarize_image_prompt = ChatPromptTemplate.from_messages([prompt_template])
+
     attributes_schema = ResponseSchema(name="Description",
                                    description="Description of image and title given",
                                    type="str")
@@ -83,9 +95,9 @@ def azure_call(sample_1,pack_1):
 
     format_instructions = output_parser.get_format_instructions()
 
-    prompt_2 = PromptTemplate(template=prompt_template_2,
-                        input_variables=["image_path","title_string", "image_sample","title_sample"],
-                        partial_variables={"format_instructions": format_instructions})
+    #prompt_2 = PromptTemplate(template=prompt_template_2,
+    #                    input_variables=["image_path","title_string", "image_sample","title_sample"],
+    #                    partial_variables={"format_instructions": format_instructions})
 
 
     model_2 = AzureChatOpenAI(azure_endpoint=azure_endpoint, api_key=api_key,
@@ -93,7 +105,7 @@ def azure_call(sample_1,pack_1):
                         model_name=model_name, 
                         temperature=0) 
 
-    chain = prompt_2 | model_2 | output_parser
+    
 
     image_sample = Image.open(requests.get("https://105103-veritiv-prod.s3.amazonaws.com/Damroot/xLg/10071/IMAGE_20044788_Pic%201.png", verify=False, stream=True).raw).convert('RGB')  
     title_sample= "Scotch® 311+ Clear High Tack Box Sealing Tape (48 mm. x 914 m., 6 Rolls/Case)"
@@ -102,9 +114,12 @@ def azure_call(sample_1,pack_1):
     # Example usage
     for image_url, title_string in zip(sample_1,pack_1):
     
-        response = requests.get(image_url, verify=False)
-        image = Image.open(BytesIO(response.content))
+        #response = requests.get(image_url, verify=False)
+        #image = Image.open(BytesIO(response.content))
         
+        formatted_prompt = prompt_template_2.format(image_url=image_url)#, title_string=title_string)
+        
+        chain = formatted_prompt | model_2 | output_parser
         result = output_llm(chain, image,title_string, image_sample,title_sample)
     
         res2.append(result)
