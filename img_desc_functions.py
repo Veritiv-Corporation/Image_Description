@@ -16,6 +16,8 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import os
 from io import BytesIO
+from langchain.chains import LLMChain
+
 
 API_KEY = "AIzaSyAZTNYe-qulKkpJRmmgwsVdVYrdCWyycvk"
 genai.configure(api_key=API_KEY)
@@ -25,6 +27,7 @@ from langchain_core.prompts import (
     HumanMessagePromptTemplate,
     MessagesPlaceholder,
 )
+from langchain_core.messages import HumanMessage
 
 def gemini_call(sample_1,pack_1):
     image_path = r"C:\Users\liyenga\OneDrive - Veritiv Corp\Documents\Veritiv Projects\Image_description\images\Pic1.png"
@@ -65,9 +68,9 @@ api_version = os.getenv('AZURE_OPENAI_VERSION')
 deployment_name = os.getenv('AZURE_DEPLOYMENT_NAME')
 model_name = os.getenv('AZURE_OPENAI_MODEL_NAME')
 
-def output_llm(chain, image_path,title_string, image_sample,title_sample):
+def output_llm(chain, image_url):
     
-    chain_result = chain.invoke({"image_path": image_path,"title_string": title_string, "image_sample": image_sample,"title_sample": title_sample})
+    chain_result = chain.invoke({"image_url": image_url})
     return chain_result.get('Description', None)
 
 def azure_call(sample_1,pack_1):
@@ -82,11 +85,20 @@ def azure_call(sample_1,pack_1):
     {format_instructions}
     """
 
-    prompt_template_2 =  HumanMessagePromptTemplate.from_template("Write a product description based on the image {image_url}")# and product title {title_string} focusing on product's uses and applications")
+    prompt_template_2o =  HumanMessagePromptTemplate.from_template("Write a product description based on the image {image_url}")# and product title {title_string} focusing on product's uses and applications")
+
+    prompt_template_2 = PromptTemplate(
+    input_variables=["image_url"],# "title_string"],  # Include any other variables
+    template="""{image_url}
 
     
 
-    #summarize_image_prompt = ChatPromptTemplate.from_messages([prompt_template])
+    Describe the image.""" )#{title_string}
+
+
+    
+
+    #summarize_image_prompt = ChatPromptTemplate.from_messages([prompt_template_2])
 
     attributes_schema = ResponseSchema(name="Description",
                                    description="Description of image and title given",
@@ -119,8 +131,10 @@ def azure_call(sample_1,pack_1):
         
         formatted_prompt = prompt_template_2.format(image_url=image_url)#, title_string=title_string)
         
-        chain = formatted_prompt | model_2 | output_parser
-        result = output_llm(chain, image,title_string, image_sample,title_sample)
+    
+        # Create the LLMChain, using the prompt template and your model
+        chain = LLMChain(llm=model_2, prompt=prompt_template_2)
+        result = output_llm(chain, image_url)
     
         res2.append(result)
     return res2
